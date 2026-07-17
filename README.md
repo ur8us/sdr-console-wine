@@ -8,6 +8,10 @@ The project scripts and documentation are [MIT licensed](LICENSE). SDR Console
 is proprietary software and remains subject to its vendor's terms; its installer
 is not included or redistributed here.
 
+## Screenshot
+
+![SDR Console running under Wine with a PlutoSDR receiver](images/Screenshot01.png)
+
 ## Supported Scope
 
 - Ubuntu 24.04 LTS is the tested platform target. Current Debian/Ubuntu
