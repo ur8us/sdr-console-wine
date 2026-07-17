@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Managed by sdr-console-wine.
+set -Eeuo pipefail
+
+readonly PREFIX="$HOME/.local/share/sdr-console-wine"
+
+notify_failure() {
+  local message=$1
+  printf '[sdr-console] error: %s\n' "$message" >&2
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send 'SDR Console cannot start' "$message" || true
+  fi
+}
+
+if ! command -v wine >/dev/null 2>&1; then
+  notify_failure 'Wine is not installed. Run ./setup.sh from the project directory.'
+  exit 1
+fi
+
+if [[ ! -d "$PREFIX/drive_c" ]]; then
+  notify_failure 'The SDR Console Wine prefix is missing. Run ./setup.sh from the project directory.'
+  exit 1
+fi
+
+APPLICATION="$(find "$PREFIX/drive_c" -type f -iname 'SDR Console.exe' -print -quit)"
+if [[ -z "$APPLICATION" ]]; then
+  notify_failure 'SDR Console.exe is missing. Run ./setup.sh --diagnose from the project directory.'
+  exit 1
+fi
+
+exec env WINEPREFIX="$PREFIX" WINEARCH=win64 WINEDEBUG=-all wine "$APPLICATION" "$@"
