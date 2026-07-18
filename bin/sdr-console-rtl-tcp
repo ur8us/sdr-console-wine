@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Managed by sdr-console-wine.
+set -Eeuo pipefail
+
+readonly CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/sdr-console-wine/rtl-tcp.conf"
+
+RTL_TCP_PORT=1234
+RTL_TCP_SAMPLE_RATE=2048000
+RTL_TCP_DEVICE_INDEX=0
+RTL_TCP_GAIN=""
+RTL_TCP_PPM=""
+RTL_TCP_BIAS_T=0
+
+die() {
+  printf '[sdr-console-rtl-tcp] error: %s\n' "$*" >&2
+  exit 1
+}
+
+is_nonnegative_integer() {
+  [[ "$1" =~ ^[0-9]+$ ]]
+}
+
+if [[ -r "$CONFIG_FILE" ]]; then
+  # shellcheck disable=SC1090
+  . "$CONFIG_FILE"
+fi
+
+command -v rtl_tcp >/dev/null 2>&1 || die 'rtl_tcp is not installed. Run ./setup.sh --rtl-tcp from the project directory.'
+is_nonnegative_integer "$RTL_TCP_PORT" || die 'RTL_TCP_PORT must be an integer.'
+(( RTL_TCP_PORT > 0 && RTL_TCP_PORT < 65536 )) || die 'RTL_TCP_PORT must be between 1 and 65535.'
+is_nonnegative_integer "$RTL_TCP_SAMPLE_RATE" || die 'RTL_TCP_SAMPLE_RATE must be an integer.'
+is_nonnegative_integer "$RTL_TCP_DEVICE_INDEX" || die 'RTL_TCP_DEVICE_INDEX must be an integer.'
+[[ "$RTL_TCP_BIAS_T" == 0 || "$RTL_TCP_BIAS_T" == 1 ]] || die 'RTL_TCP_BIAS_T must be 0 or 1.'
+
+args=(-a 127.0.0.1 -p "$RTL_TCP_PORT" -s "$RTL_TCP_SAMPLE_RATE" -d "$RTL_TCP_DEVICE_INDEX")
+[[ -z "$RTL_TCP_GAIN" ]] || args+=(-g "$RTL_TCP_GAIN")
+[[ -z "$RTL_TCP_PPM" ]] || args+=(-P "$RTL_TCP_PPM")
+[[ "$RTL_TCP_BIAS_T" == 1 ]] && args+=(-T)
+
+exec rtl_tcp "${args[@]}"

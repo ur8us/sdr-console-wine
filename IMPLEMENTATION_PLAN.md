@@ -73,9 +73,14 @@ clear English documentation so users do not need an AI agent to complete setup.
 - Provide a non-destructive `--diagnose` that checks architecture, Wine
   packages, prefix integrity, the installed executable, and launchers. It must
   not probe hardware or use the network.
+- Provide an opt-in `--rtl-tcp` mode that uses an existing `rtl_tcp` command,
+  or installs Ubuntu's `rtl-sdr` package when needed, and manages a per-user
+  service on `127.0.0.1:1234`. This is the supported RTL-SDR path because Wine
+  cannot expose the physical USB device to SDR Console's Windows USB driver.
 - Provide `uninstall.sh` that removes only script-owned user state: the prefix,
-  launchers, command wrapper, logs, and state. It must not remove Wine `apt`
-  packages; document optional manual package removal separately.
+  launchers, command wrapper, logs, state, and optional RTL-SDR bridge. It must
+  not remove Wine or RTL-SDR `apt` packages; document optional manual package
+  removal separately.
 
 ## SDR Hardware Scope
 
@@ -85,9 +90,12 @@ clear English documentation so users do not need an AI agent to complete setup.
   may use a different receiver.
 - The first required compatibility-matrix entry is PlutoSDR over an already
   configured IP connection.
-- RTL-SDR and every other USB radio are out of scope for the first release and
-  must be marked `not tested`. Do not add USB drivers, `udev` rules, or claim
-  generic USB compatibility.
+- RTL-SDR direct USB access from SDR Console under Wine is unsupported. Do not
+  install Windows USB drivers or claim generic Wine USB compatibility.
+- RTL-SDR is supported through the opt-in native `rtl_tcp` bridge: Linux owns
+  the USB device and SDR Console connects to its localhost TCP source.
+- Every other USB radio remains `not tested`. Do not add USB drivers, `udev`
+  rules, or claim generic USB compatibility.
 - Add USB devices to the supported matrix only after testing their exact model
   and access path on Linux/Wine.
 

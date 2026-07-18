@@ -6,6 +6,12 @@ readonly PREFIX="$HOME/.local/share/sdr-console-wine"
 readonly STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/sdr-console-wine"
 readonly WRAPPER_PATH="$HOME/.local/bin/sdr-console"
 readonly DESKTOP_FILE="${XDG_DATA_HOME:-$HOME/.local/share}/applications/sdr-console-wine.desktop"
+readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/sdr-console-wine"
+readonly RTL_TCP_CONFIG="$CONFIG_DIR/rtl-tcp.conf"
+readonly SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+readonly RTL_TCP_SERVICE='sdr-console-rtl-tcp.service'
+readonly RTL_TCP_SERVICE_PATH="$SYSTEMD_USER_DIR/$RTL_TCP_SERVICE"
+readonly RTL_TCP_RUNNER_PATH="$HOME/.local/bin/sdr-console-rtl-tcp"
 
 DRY_RUN=0
 ASSUME_YES=0
@@ -86,6 +92,25 @@ remove_managed_file() {
   fi
 }
 
+remove_rtl_tcp_bridge() {
+  if [[ -f "$RTL_TCP_SERVICE_PATH" ]] && grep -Fqx '# Managed by sdr-console-wine.' "$RTL_TCP_SERVICE_PATH"; then
+    if (( DRY_RUN )); then
+      info "would stop and disable RTL-SDR bridge: $RTL_TCP_SERVICE"
+    else
+      systemctl --user disable --now "$RTL_TCP_SERVICE" >/dev/null 2>&1 || true
+      info "stopped and disabled RTL-SDR bridge: $RTL_TCP_SERVICE"
+    fi
+  fi
+
+  remove_managed_file "$RTL_TCP_SERVICE_PATH" '# Managed by sdr-console-wine.' 'RTL-SDR bridge service'
+  remove_managed_file "$RTL_TCP_RUNNER_PATH" '# Managed by sdr-console-wine.' 'RTL-SDR bridge runner'
+  remove_managed_file "$RTL_TCP_CONFIG" '# Managed by sdr-console-wine. Values are read by sdr-console-rtl-tcp.' 'RTL-SDR bridge configuration'
+
+  if (( ! DRY_RUN )) && command -v systemctl >/dev/null 2>&1; then
+    systemctl --user daemon-reload || true
+  fi
+}
+
 main() {
   parse_args "$@"
   (( EUID != 0 )) || die 'Do not run uninstall as root.'
@@ -100,6 +125,7 @@ main() {
   remove_if_present "$STATE_DIR" 'local logs and install state'
   remove_managed_file "$WRAPPER_PATH" '# Managed by sdr-console-wine.' 'terminal launcher'
   remove_managed_file "$DESKTOP_FILE" 'X-SDR-Console-Wine-Managed=true' 'desktop launcher'
+  remove_rtl_tcp_bridge
   info 'Wine apt packages were left installed intentionally.'
 }
 

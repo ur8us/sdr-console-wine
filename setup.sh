@@ -11,6 +11,13 @@ readonly WRAPPER_PATH="$USER_BIN_DIR/sdr-console"
 readonly APPLICATIONS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 readonly DESKTOP_FILE="$APPLICATIONS_DIR/sdr-console-wine.desktop"
 readonly RUNNER_SOURCE="$SCRIPT_DIR/bin/sdr-console"
+readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/sdr-console-wine"
+readonly RTL_TCP_CONFIG="$CONFIG_DIR/rtl-tcp.conf"
+readonly SYSTEMD_USER_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+readonly RTL_TCP_SERVICE='sdr-console-rtl-tcp.service'
+readonly RTL_TCP_SERVICE_PATH="$SYSTEMD_USER_DIR/$RTL_TCP_SERVICE"
+readonly RTL_TCP_RUNNER_SOURCE="$SCRIPT_DIR/bin/sdr-console-rtl-tcp"
+readonly RTL_TCP_RUNNER_PATH="$USER_BIN_DIR/sdr-console-rtl-tcp"
 
 DRY_RUN=0
 DIAGNOSE=0
@@ -18,6 +25,7 @@ INTERACTIVE=0
 UPGRADE=0
 ASSUME_YES=0
 RESET=0
+RTL_TCP=0
 INSTALLER_PATH=""
 INSTALLER_SHA256=""
 LOG_FILE=""
@@ -33,13 +41,15 @@ Options:
   --diagnose     Check the existing installation without changing anything.
   --interactive  Show the Windows installer instead of using silent mode.
   --upgrade      Intentionally install a different staged installer.
+  --rtl-tcp      Install and start the local RTL-SDR TCP bridge.
   --reset        Remove SDR Console user state, launchers, and logs.
   --yes          Confirm the vendor-terms prompt non-interactively.
   -h, --help     Show this help.
 
 Place exactly one SDR Console .exe installer in place-setup-exe-file-here/
-before using install, upgrade, or dry-run mode. Do not run this script with
-sudo; it requests sudo only for required apt package installation.
+before using install, upgrade, or dry-run mode. The --rtl-tcp option does not
+need an installer. Do not run this script with sudo; it requests sudo only for
+required apt package installation.
 EOF
 }
 
@@ -166,6 +176,90 @@ ensure_dependencies() {
   sudo env DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends wine wine64 wine32:i386
 
   dependencies_ready || die 'Wine dependencies are still incomplete after apt installation.'
+}
+
+rtl_tcp_ready() {
+  command -v rtl_tcp >/dev/null 2>&1
+}
+
+describe_rtl_tcp_plan() {
+  if rtl_tcp_ready; then
+    info "using existing rtl_tcp: $(command -v rtl_tcp)"
+  else
+    info 'would run: sudo apt-get update'
+    info 'would run: sudo apt-get install --no-install-recommends rtl-sdr'
+  fi
+  info "would install the user service: $RTL_TCP_SERVICE_PATH"
+  info "would start a local RTL-SDR bridge at 127.0.0.1:1234"
+}
+
+ensure_rtl_tcp_dependency() {
+  info 'checking RTL-SDR TCP bridge dependency'
+  if rtl_tcp_ready; then
+    info "using existing rtl_tcp: $(command -v rtl_tcp)"
+    return
+  fi
+
+  info 'installing the rtl-sdr package'
+  sudo -v
+  sudo env DEBIAN_FRONTEND=noninteractive apt-get update
+  sudo env DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends rtl-sdr
+  rtl_tcp_ready || die 'The rtl-sdr package did not provide rtl_tcp as expected.'
+}
+
+write_rtl_tcp_config() {
+  [[ -f "$RTL_TCP_CONFIG" ]] && return
+  mkdir -p "$CONFIG_DIR"
+  cat > "$RTL_TCP_CONFIG" <<'EOF'
+# Managed by sdr-console-wine. Values are read by sdr-console-rtl-tcp.
+# Keep the bridge on localhost so the USB receiver is not exposed on the LAN.
+RTL_TCP_PORT=1234
+RTL_TCP_SAMPLE_RATE=2048000
+RTL_TCP_DEVICE_INDEX=0
+RTL_TCP_GAIN=
+RTL_TCP_PPM=
+RTL_TCP_BIAS_T=0
+EOF
+}
+
+write_rtl_tcp_service() {
+  mkdir -p "$USER_BIN_DIR" "$SYSTEMD_USER_DIR"
+  install -m 0755 "$RTL_TCP_RUNNER_SOURCE" "$RTL_TCP_RUNNER_PATH"
+  cat > "$RTL_TCP_SERVICE_PATH" <<EOF
+# Managed by sdr-console-wine.
+[Unit]
+Description=Local RTL-SDR bridge for SDR Console
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=$RTL_TCP_RUNNER_PATH
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+EOF
+}
+
+install_rtl_tcp_bridge() {
+  info 'configuring the local RTL-SDR TCP bridge'
+  [[ -x "$RTL_TCP_RUNNER_SOURCE" ]] || die "Missing RTL-SDR bridge runner: $RTL_TCP_RUNNER_SOURCE"
+  command -v systemctl >/dev/null 2>&1 || die 'systemctl is required to manage the RTL-SDR bridge.'
+
+  ensure_rtl_tcp_dependency
+  write_rtl_tcp_config
+  write_rtl_tcp_service
+  systemctl --user daemon-reload
+  systemctl --user enable --now "$RTL_TCP_SERVICE"
+
+  if ! systemctl --user is-active --quiet "$RTL_TCP_SERVICE"; then
+    journalctl --user -u "$RTL_TCP_SERVICE" -n 30 --no-pager >&2 || true
+    die "The RTL-SDR bridge did not start. Check: journalctl --user -u $RTL_TCP_SERVICE"
+  fi
+
+  info 'RTL-SDR bridge is active at 127.0.0.1:1234'
+  info 'In SDR Console, add or select "RTL Dongle (TCP)" with address 127.0.0.1 and port 1234.'
 }
 
 find_application() {
@@ -324,6 +418,7 @@ parse_args() {
       --diagnose) DIAGNOSE=1 ;;
       --interactive) INTERACTIVE=1 ;;
       --upgrade) UPGRADE=1 ;;
+      --rtl-tcp) RTL_TCP=1 ;;
       --reset) RESET=1 ;;
       --yes) ASSUME_YES=1 ;;
       -h|--help) usage; exit 0 ;;
@@ -337,6 +432,9 @@ parse_args() {
   fi
   if (( DRY_RUN && DIAGNOSE )); then
     die '--dry-run cannot be combined with --diagnose.'
+  fi
+  if (( RTL_TCP && (DIAGNOSE || INTERACTIVE || UPGRADE || RESET) )); then
+    die '--rtl-tcp cannot be combined with --diagnose, --interactive, --upgrade, or --reset.'
   fi
 }
 
@@ -356,6 +454,18 @@ main() {
   fi
 
   check_platform
+
+  if (( RTL_TCP )); then
+    if (( DRY_RUN )); then
+      info 'dry run: no packages, configuration, or user services will be changed'
+      describe_rtl_tcp_plan
+      return
+    fi
+    init_logging
+    install_rtl_tcp_bridge
+    return
+  fi
+
   select_installer
 
   if (( DRY_RUN )); then
