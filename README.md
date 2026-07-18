@@ -114,6 +114,30 @@ not fixed by reinstalling SDR Console. The detailed test scope, observations,
 and non-invasive cleanup boundaries are recorded in
 [the Wine 11 evaluation](docs/WINE11-EVALUATION.md).
 
+### Title Bar Overlap
+
+On this GNOME Wayland/Wine 9 combination, Mutter's title bar can overlap the
+top-left SDR Console controls. It is a window-decoration defect, not an SDR
+Console installation problem. Hide the Wine title bar for SDR Console only,
+then close and restart the application:
+
+```bash
+./setup.sh --window-decoration off
+```
+
+This writes Wine's app-specific `Decorated=N` setting for `SDR Console.exe`.
+The application becomes borderless, so use `Alt+F4` to close it and `Alt` plus
+left-drag to move it. Re-enable the title bar with:
+
+```bash
+./setup.sh --window-decoration on
+```
+
+This setting does not change GNOME, other Wine applications, SDR Console
+program files, or its saved radio settings. It removes only the overlapping
+top-level frame; it does not fix the separate Mode/Filter repaint issue after
+scrolling.
+
 ### Selected Controls And Application Style
 
 The yellow marker shown for the selected mode, such as **BC-FM**, is drawn by
@@ -150,6 +174,7 @@ GNOME/KDE scaling.
 | `./setup.sh --rtl-tcp --dry-run` | Show the RTL-SDR bridge actions without changing the system. |
 | `./setup.sh --fix-fonts` | Install the bundled prefix-only compatibility font, then restart SDR Console. |
 | `./setup.sh --dpi 144` | Set the SDR Console Wine prefix to 144 DPI, then restart SDR Console. |
+| `./setup.sh --window-decoration off` | Hide the Wine title bar for SDR Console only, then restart it. Use `on` to restore it. |
 | `./setup.sh --reset` | Remove the isolated installation and all SDR Console settings after confirmation. |
 | `./uninstall.sh` | Remove project-owned prefix, launchers, logs, and state after confirmation. |
 | `./uninstall.sh --dry-run` | List the files that uninstall would remove. |
@@ -176,6 +201,9 @@ creation, SDR Console installation, launcher creation, and verification.
   maps Segoe UI to it. It never modifies SDR Console executable or DLL files;
   unsupported supplementary-plane menu icons can therefore remain rectangles
   under Wine 9.
+- `./setup.sh --window-decoration on|off` changes only Wine's per-application
+  title-bar setting for `SDR Console.exe`; it never changes GNOME or another
+  Wine application's window decorations.
 - The optional RTL-SDR bridge is a per-user service named
   `sdr-console-rtl-tcp.service`. Its settings are in
   `~/.config/sdr-console-wine/rtl-tcp.conf`; it is deliberately bound to

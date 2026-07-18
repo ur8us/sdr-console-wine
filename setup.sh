@@ -22,6 +22,7 @@ readonly BUNDLED_COMPATIBILITY_FONT="$SCRIPT_DIR/fonts/SDRConsoleUI.ttf"
 readonly SEGOE_UI_REPLACEMENT='SDR Console UI'
 readonly SDR_CONSOLE_FONT_FILE='SDRConsoleUI.ttf'
 readonly SDR_CONSOLE_FONT_PATH="$PREFIX/drive_c/windows/Fonts/$SDR_CONSOLE_FONT_FILE"
+readonly SDR_CONSOLE_X11_DRIVER_KEY='HKCU\Software\Wine\AppDefaults\sdr console.exe\X11 Driver'
 
 DRY_RUN=0
 DIAGNOSE=0
@@ -32,6 +33,7 @@ RESET=0
 RTL_TCP=0
 FONT_FIX=0
 DPI=""
+WINDOW_DECORATION=""
 INSTALLER_PATH=""
 INSTALLER_SHA256=""
 LOG_FILE=""
@@ -50,14 +52,17 @@ Options:
   --rtl-tcp      Install and start the local RTL-SDR TCP bridge.
   --fix-fonts    Repair SDR Console's missing display symbols.
   --dpi VALUE    Set the SDR Console Wine prefix DPI (for example: 96, 120, 144).
+  --window-decoration VALUE
+                 Use the Wine title bar for SDR Console: on or off.
   --reset        Remove SDR Console user state, launchers, and logs.
   --yes          Confirm the vendor-terms prompt non-interactively.
   -h, --help     Show this help.
 
 Place exactly one SDR Console .exe installer in place-setup-exe-file-here/
-before using install, upgrade, or dry-run mode. The --rtl-tcp, --fix-fonts, and
---dpi options do not need an installer. Do not run this script with sudo; it
-requests sudo only for required apt package installation.
+before using install, upgrade, or dry-run mode. The --rtl-tcp, --fix-fonts,
+--dpi, and --window-decoration options do not need an installer. Do not run
+this script with sudo; it requests sudo only for required apt package
+installation.
 EOF
 }
 
@@ -304,6 +309,34 @@ configure_dpi() {
   info 'DPI change complete; close and restart SDR Console to apply it'
 }
 
+validate_window_decoration() {
+  case "$WINDOW_DECORATION" in
+    on|off) ;;
+    *) die '--window-decoration requires on or off.' ;;
+  esac
+}
+
+configure_window_decoration() {
+  [[ -d "$PREFIX" ]] || die 'The SDR Console Wine prefix is missing. Run ./setup.sh first.'
+  validate_window_decoration
+
+  local registry_value
+  case "$WINDOW_DECORATION" in
+    on)
+      registry_value='Y'
+      info 'enabling the Wine title bar for SDR Console'
+      ;;
+    off)
+      registry_value='N'
+      info 'disabling the Wine title bar for SDR Console'
+      ;;
+  esac
+
+  WINEPREFIX="$PREFIX" wine reg add "$SDR_CONSOLE_X11_DRIVER_KEY" \
+    /v Decorated /t REG_SZ /d "$registry_value" /f
+  info 'window-decoration change complete; close and restart SDR Console to apply it'
+}
+
 find_application() {
   local drive_c="$PREFIX/drive_c"
   [[ -d "$drive_c" ]] || return 1
@@ -467,6 +500,11 @@ parse_args() {
         (( $# > 0 )) || die '--dpi requires a value, for example: --dpi 144.'
         DPI="$1"
         ;;
+      --window-decoration)
+        shift
+        (( $# > 0 )) || die '--window-decoration requires on or off.'
+        WINDOW_DECORATION="$1"
+        ;;
       --reset) RESET=1 ;;
       --yes) ASSUME_YES=1 ;;
       -h|--help) usage; exit 0 ;;
@@ -489,6 +527,11 @@ parse_args() {
   fi
   if [[ -n "$DPI" ]] && (( DIAGNOSE || INTERACTIVE || UPGRADE || RESET || RTL_TCP || FONT_FIX )); then
     die '--dpi cannot be combined with --diagnose, --interactive, --upgrade, --rtl-tcp, --fix-fonts, or --reset.'
+  fi
+  if [[ -n "$WINDOW_DECORATION" ]]; then
+    if (( DIAGNOSE || INTERACTIVE || UPGRADE || RESET || RTL_TCP || FONT_FIX )) || [[ -n "$DPI" ]]; then
+      die '--window-decoration cannot be combined with --diagnose, --interactive, --upgrade, --rtl-tcp, --fix-fonts, --dpi, or --reset.'
+    fi
   fi
 }
 
@@ -542,6 +585,22 @@ main() {
     fi
     init_logging
     configure_dpi
+    return
+  fi
+
+  if [[ -n "$WINDOW_DECORATION" ]]; then
+    if (( DRY_RUN )); then
+      validate_window_decoration
+      info 'dry run: no Wine registry values will be changed'
+      if [[ "$WINDOW_DECORATION" == 'off' ]]; then
+        info 'would disable the Wine title bar for SDR Console only'
+      else
+        info 'would enable the Wine title bar for SDR Console only'
+      fi
+      return
+    fi
+    init_logging
+    configure_window_decoration
     return
   fi
 

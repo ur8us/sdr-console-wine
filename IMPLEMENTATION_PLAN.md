@@ -56,6 +56,10 @@ clear English documentation so users do not need an AI agent to complete setup.
 - Provide a `--dpi VALUE` command that changes only the isolated SDR Console
   Wine prefix. This makes high-DPI correction reproducible and avoids users
   mistakenly changing their unrelated default `~/.wine` prefix.
+- Provide a reversible `--window-decoration on|off` command for the Wine
+  X11-driver title bar on `SDR Console.exe` only. It addresses a tested
+  Mutter-frame overlap without changing the user's desktop, other Wine
+  applications, or SDR Console files.
 - Install only named `apt` dependencies. Do not use `winetricks` or download
   Wine components from third-party sources. The manually supplied installer and
   its bundled Visual C++ redistributables are the only Windows installer input.
