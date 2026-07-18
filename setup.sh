@@ -20,6 +20,10 @@ readonly RTL_TCP_RUNNER_SOURCE="$SCRIPT_DIR/bin/sdr-console-rtl-tcp"
 readonly RTL_TCP_RUNNER_PATH="$USER_BIN_DIR/sdr-console-rtl-tcp"
 readonly FULL_WEBDINGS_FONT='/usr/share/fonts/truetype/msttcorefonts/Webdings.ttf'
 readonly PREFIX_WEBDINGS_FONT="$PREFIX/drive_c/windows/Fonts/Webdings.ttf"
+readonly FREE_WINGDINGS_URL='https://raw.githubusercontent.com/linuxdeepin/deepin-opensymbol-fonts/cf2404aee28fc895c01d6e5fdd6c4d38c8af1d3d/fonts/DeepinOpenSymbol.ttf'
+readonly FREE_WINGDINGS_SHA256='887664b9bcea8d57d81ddf9471f4c4d61d97a1318cd5626d719cc5fe9346c04e'
+readonly FREE_WINGDINGS_CACHE="$STATE_DIR/fonts/DeepinOpenSymbol.ttf"
+readonly PREFIX_WINGDINGS_FONT="$PREFIX/drive_c/windows/Fonts/Wingdings.ttf"
 
 DRY_RUN=0
 DIAGNOSE=0
@@ -46,7 +50,7 @@ Options:
   --interactive  Show the Windows installer instead of using silent mode.
   --upgrade      Intentionally install a different staged installer.
   --rtl-tcp      Install and start the local RTL-SDR TCP bridge.
-  --fix-fonts    Use the full local Webdings font for missing SDR Console symbols.
+  --fix-fonts    Repair missing SDR Console symbols with prefix-local fonts.
   --dpi VALUE    Set the SDR Console Wine prefix DPI (for example: 96, 120, 144).
   --reset        Remove SDR Console user state, launchers, and logs.
   --yes          Confirm the vendor-terms prompt non-interactively.
@@ -272,27 +276,53 @@ full_webdings_available() {
   [[ -f "$FULL_WEBDINGS_FONT" ]]
 }
 
-configure_webdings_font() {
-  [[ -d "$PREFIX" ]] || die 'The SDR Console Wine prefix is missing. Run ./setup.sh first.'
-  full_webdings_available || die "The full Webdings font is not installed. Install ttf-mscorefonts-installer, then re-run ./setup.sh --fix-fonts."
-
-  info 'installing the full local Webdings font in the Wine prefix'
-  if [[ ! -f "$PREFIX_WEBDINGS_FONT" ]] || ! cmp -s "$FULL_WEBDINGS_FONT" "$PREFIX_WEBDINGS_FONT"; then
-    mkdir -p "$(dirname "$PREFIX_WEBDINGS_FONT")"
-    install -m 0644 "$FULL_WEBDINGS_FONT" "$PREFIX_WEBDINGS_FONT"
-  fi
-  WINEPREFIX="$PREFIX" wine reg add 'HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts' \
-    /v 'Webdings (TrueType)' /t REG_SZ /d 'Webdings.ttf' /f
-  WINEPREFIX="$PREFIX" wineboot -u
-  info 'font repair complete; close and restart SDR Console to reload its fonts'
+font_matches_checksum() {
+  local path=$1
+  local expected=$2
+  [[ "$(sha256sum -- "$path" | awk '{print $1}')" == "$expected" ]]
 }
 
-configure_webdings_font_if_available() {
-  if full_webdings_available; then
-    configure_webdings_font
-  else
-    warn 'The full Webdings font is unavailable. If SDR Console shows rectangles for the >|< control, install ttf-mscorefonts-installer and run ./setup.sh --fix-fonts.'
+install_prefix_font() {
+  local source_font=$1
+  local prefix_font=$2
+
+  if [[ ! -f "$prefix_font" ]] || ! cmp -s "$source_font" "$prefix_font"; then
+    mkdir -p "$(dirname "$prefix_font")"
+    install -m 0644 "$source_font" "$prefix_font"
   fi
+}
+
+ensure_free_wingdings_font() {
+  if [[ -f "$FREE_WINGDINGS_CACHE" ]] && font_matches_checksum "$FREE_WINGDINGS_CACHE" "$FREE_WINGDINGS_SHA256"; then
+    return
+  fi
+
+  command -v curl >/dev/null 2>&1 || die 'curl is required to download the free Wingdings-compatible font.'
+  info 'downloading the free Wingdings-compatible font'
+  mkdir -p "$(dirname "$FREE_WINGDINGS_CACHE")"
+  curl --fail --location --proto '=https' --retry 3 --silent --show-error --output "$FREE_WINGDINGS_CACHE" "$FREE_WINGDINGS_URL"
+  font_matches_checksum "$FREE_WINGDINGS_CACHE" "$FREE_WINGDINGS_SHA256" || die 'The downloaded Wingdings-compatible font did not match its expected SHA-256.'
+}
+
+configure_symbol_fonts() {
+  [[ -d "$PREFIX" ]] || die 'The SDR Console Wine prefix is missing. Run ./setup.sh first.'
+
+  if full_webdings_available; then
+    info 'installing the full local Webdings font in the Wine prefix'
+    install_prefix_font "$FULL_WEBDINGS_FONT" "$PREFIX_WEBDINGS_FONT"
+    WINEPREFIX="$PREFIX" wine reg add 'HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts' \
+      /v 'Webdings (TrueType)' /t REG_SZ /d 'Webdings.ttf' /f
+  else
+    warn 'The full Webdings font is unavailable. Install ttf-mscorefonts-installer to repair every SDR Console symbol.'
+  fi
+
+  ensure_free_wingdings_font
+  info 'installing the free Wingdings-compatible font in the Wine prefix'
+  install_prefix_font "$FREE_WINGDINGS_CACHE" "$PREFIX_WINGDINGS_FONT"
+  WINEPREFIX="$PREFIX" wine reg add 'HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts' \
+    /v 'Wingdings (TrueType)' /t REG_SZ /d 'Wingdings.ttf' /f
+  WINEPREFIX="$PREFIX" wineboot -u
+  info 'font repair complete; close and restart SDR Console to reload its fonts'
 }
 
 validate_dpi() {
@@ -532,12 +562,14 @@ main() {
       if full_webdings_available; then
         info "would install $FULL_WEBDINGS_FONT as $PREFIX_WEBDINGS_FONT"
       else
-        info 'would require ttf-mscorefonts-installer before the font repair can run'
+        info 'would skip the optional full Webdings font because ttf-mscorefonts-installer is unavailable'
       fi
+      info "would download the pinned free Wingdings-compatible font to $FREE_WINGDINGS_CACHE"
+      info "would install it as $PREFIX_WINGDINGS_FONT"
       return
     fi
     init_logging
-    configure_webdings_font
+    configure_symbol_fonts
     return
   fi
 
@@ -591,7 +623,7 @@ main() {
     info 'existing SDR Console installation matches the staged installer; repairing launchers only'
     ensure_dependencies
     init_logging
-    configure_webdings_font_if_available
+    configure_symbol_fonts
     write_launchers
     verify_installation
     return
@@ -601,7 +633,7 @@ main() {
   ensure_dependencies
   init_logging
   initialize_prefix
-  configure_webdings_font_if_available
+  configure_symbol_fonts
   run_installer
   write_launchers
   verify_installation
