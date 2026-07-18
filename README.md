@@ -93,9 +93,10 @@ sudo apt install ttf-mscorefonts-installer
 ./setup.sh --fix-fonts
 ```
 
-`--fix-fonts` does not download fonts or modify system settings. It maps the
-locally installed Webdings font into SDR Console's Wine prefix. Normal setup
-also applies the mapping automatically when that font is already installed.
+`--fix-fonts` does not download fonts or modify system settings. It copies the
+locally installed Webdings font into SDR Console's isolated Wine prefix, where
+Wine reliably selects it instead of its incomplete built-in fallback. Normal
+setup also applies the repair automatically when that font is already installed.
 
 ### Interface Scaling
 
@@ -122,7 +123,7 @@ Console prefix and never changes the desktop's GNOME/KDE scaling.
 | `./setup.sh --upgrade` | Intentionally install a different staged installer. Normal reruns never upgrade automatically. |
 | `./setup.sh --rtl-tcp` | Install and start the local RTL-SDR TCP bridge; no SDR Console installer is required. |
 | `./setup.sh --rtl-tcp --dry-run` | Show the RTL-SDR bridge actions without changing the system. |
-| `./setup.sh --fix-fonts` | Map an already installed full Webdings font into the Wine prefix, then restart SDR Console. |
+| `./setup.sh --fix-fonts` | Install an already installed full Webdings font in the Wine prefix, then restart SDR Console. |
 | `./setup.sh --dpi 144` | Set the SDR Console Wine prefix to 144 DPI, then restart SDR Console. |
 | `./setup.sh --reset` | Remove the isolated installation and all SDR Console settings after confirmation. |
 | `./uninstall.sh` | Remove project-owned prefix, launchers, logs, and state after confirmation. |
@@ -146,8 +147,8 @@ creation, SDR Console installation, launcher creation, and verification.
   `${XDG_STATE_HOME:-~/.local/state}/sdr-console-wine/logs/`.
 - It creates `~/.local/bin/sdr-console` and a desktop-menu launcher. Both use
   the isolated prefix.
-- When the full local Webdings font is available, it maps that font into the
-  Wine prefix so the `>|<` display-centering symbols render correctly.
+- When the full local Webdings font is available, it installs a prefix-local
+  copy so Wine selects it and the `>|<` display-centering symbols render correctly.
 - The optional RTL-SDR bridge is a per-user service named
   `sdr-console-rtl-tcp.service`. Its settings are in
   `~/.config/sdr-console-wine/rtl-tcp.conf`; it is deliberately bound to

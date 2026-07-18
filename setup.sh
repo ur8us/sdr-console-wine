@@ -19,6 +19,7 @@ readonly RTL_TCP_SERVICE_PATH="$SYSTEMD_USER_DIR/$RTL_TCP_SERVICE"
 readonly RTL_TCP_RUNNER_SOURCE="$SCRIPT_DIR/bin/sdr-console-rtl-tcp"
 readonly RTL_TCP_RUNNER_PATH="$USER_BIN_DIR/sdr-console-rtl-tcp"
 readonly FULL_WEBDINGS_FONT='/usr/share/fonts/truetype/msttcorefonts/Webdings.ttf'
+readonly PREFIX_WEBDINGS_FONT="$PREFIX/drive_c/windows/Fonts/Webdings.ttf"
 
 DRY_RUN=0
 DIAGNOSE=0
@@ -275,9 +276,14 @@ configure_webdings_font() {
   [[ -d "$PREFIX" ]] || die 'The SDR Console Wine prefix is missing. Run ./setup.sh first.'
   full_webdings_available || die "The full Webdings font is not installed. Install ttf-mscorefonts-installer, then re-run ./setup.sh --fix-fonts."
 
-  info 'configuring the full Webdings font for Wine'
+  info 'installing the full local Webdings font in the Wine prefix'
+  if [[ ! -f "$PREFIX_WEBDINGS_FONT" ]] || ! cmp -s "$FULL_WEBDINGS_FONT" "$PREFIX_WEBDINGS_FONT"; then
+    mkdir -p "$(dirname "$PREFIX_WEBDINGS_FONT")"
+    install -m 0644 "$FULL_WEBDINGS_FONT" "$PREFIX_WEBDINGS_FONT"
+  fi
   WINEPREFIX="$PREFIX" wine reg add 'HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts' \
-    /v 'Webdings (TrueType)' /t REG_SZ /d 'Z:\usr\share\fonts\truetype\msttcorefonts\Webdings.ttf' /f
+    /v 'Webdings (TrueType)' /t REG_SZ /d 'Webdings.ttf' /f
+  WINEPREFIX="$PREFIX" wineboot -u
   info 'font repair complete; close and restart SDR Console to reload its fonts'
 }
 
@@ -524,7 +530,7 @@ main() {
     if (( DRY_RUN )); then
       info 'dry run: no Wine registry values will be changed'
       if full_webdings_available; then
-        info "would map Webdings to $FULL_WEBDINGS_FONT in the SDR Console Wine prefix"
+        info "would install $FULL_WEBDINGS_FONT as $PREFIX_WEBDINGS_FONT"
       else
         info 'would require ttf-mscorefonts-installer before the font repair can run'
       fi
