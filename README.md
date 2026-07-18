@@ -82,9 +82,9 @@ report zero devices under Wine.
 
 ### Missing Display Symbols
 
-If SDR Console shows rectangles between **High** and **Zoom**, or before
-**Server** in **Select Radio**, apply the prefix-only repair and restart SDR
-Console:
+If SDR Console shows rectangles between **High** and **Zoom**, or in menu items
+such as **Console Streamer**, **V3 Server**, and audio-device names, apply the
+prefix-only repair and restart SDR Console:
 
 ```bash
 ./setup.sh --fix-fonts
@@ -93,15 +93,16 @@ Console:
 `--fix-fonts` builds a local **SDR Console UI** compatibility font from the
 distribution's free DejaVu Sans and Noto Sans Symbols 2 fonts, then maps
 Wine's **Segoe UI** request to it. This restores the `>|<`
-panoramic-centering control. Wine 9 also renders the Server network icon's
-Unicode surrogate pair as two characters, so the command makes a guarded
-in-place change to the installed `SDRSelectRadio.dll`: it replaces only the
-known Server-tab label with two private-use glyph slots in the compatibility
-font. No vendor binary is included, downloaded, or modified outside the
-isolated Wine prefix. The guarded patch is skipped with a warning when a later
-SDR Console release changes that exact label; rerun `--fix-fonts` after an
-upgrade. If needed, the script installs `fonts-dejavu-core`, `fonts-noto-core`,
-and `python3-fonttools`. Normal setup applies the repair after installing SDR
+panoramic-centering control. Wine 9 also renders supplementary-plane menu
+icons as separate UTF-16 surrogate characters. The repair scans the installed
+SDR Console `.exe` and `.dll` files and, only for symbol-prefixed UTF-16 labels,
+replaces the confirmed laptop, network, and loudspeaker icons with same-width
+private-use pairs from the compatibility font. It is not tied to an SDR Console
+build or to fixed label text. Rerun `--fix-fonts` after an SDR Console upgrade;
+it rebuilds the font and reapplies any necessary label repairs. No vendor binary
+is included, downloaded, or modified outside the isolated Wine prefix. If
+needed, the script installs `fonts-dejavu-core`, `fonts-noto-core`, and
+`python3-fonttools`. Normal setup applies the repair after installing SDR
 Console.
 
 ### Selected Controls And Application Style
@@ -162,9 +163,10 @@ creation, SDR Console installation, launcher creation, and verification.
 - It creates `~/.local/bin/sdr-console` and a desktop-menu launcher. Both use
   the isolated prefix.
 - It builds a free SDR Console UI font in the isolated Wine prefix, maps Segoe
-  UI to it, and applies a guarded local `SDRSelectRadio.dll` label patch for
-  Wine's Server-tab surrogate-pair defect. It never distributes or downloads a
-  vendor DLL, and leaves an unrecognized DLL unchanged.
+  UI to it, and repairs supported symbol-prefixed labels in the installed SDR
+  Console executable and DLL files for Wine's surrogate-pair defect. It never
+  distributes or downloads a vendor binary, and leaves unrelated files
+  unchanged.
 - The optional RTL-SDR bridge is a per-user service named
   `sdr-console-rtl-tcp.service`. Its settings are in
   `~/.config/sdr-console-wine/rtl-tcp.conf`; it is deliberately bound to

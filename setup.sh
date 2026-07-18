@@ -291,10 +291,6 @@ ensure_symbol_font_dependencies() {
   symbol_font_dependencies_ready || die 'The required free font-build dependencies are still incomplete after apt installation.'
 }
 
-find_sdr_select_radio_dll() {
-  find "$PREFIX/drive_c" -type f -iname 'SDRSelectRadio.dll' -print -quit
-}
-
 build_sdr_console_ui_font() {
   [[ -x "$FONT_BUILDER_SOURCE" ]] || die "Missing font builder: $FONT_BUILDER_SOURCE"
   mkdir -p "$(dirname -- "$SDR_CONSOLE_FONT_PATH")"
@@ -305,16 +301,22 @@ build_sdr_console_ui_font() {
   chmod 0644 "$SDR_CONSOLE_FONT_PATH"
 }
 
-patch_server_tab_symbol() {
-  local select_radio_dll
-  select_radio_dll="$(find_sdr_select_radio_dll || true)"
-  if [[ -z "$select_radio_dll" ]]; then
-    warn 'SDRSelectRadio.dll was not found; skipped the Server-tab network-symbol repair.'
+patch_sdr_console_label_symbols() {
+  local application application_dir candidate
+  local -a application_files=()
+  application="$(find_application || true)"
+  if [[ -z "$application" ]]; then
+    warn 'SDR Console.exe was not found; skipped the installed-label symbol repair.'
     return
   fi
+  application_dir="$(dirname -- "$application")"
+  while IFS= read -r -d '' candidate; do
+    application_files+=("$candidate")
+  done < <(find "$application_dir" -type f \( -iname '*.dll' -o -iname '*.exe' \) -print0)
 
-  if ! "$PYTHON_BIN" "$FONT_BUILDER_SOURCE" --patch-server-tab "$select_radio_dll"; then
-    warn 'The installed SDRSelectRadio.dll did not match the guarded Server-tab patch; other font repairs were applied.'
+  if ! "$PYTHON_BIN" "$FONT_BUILDER_SOURCE" --patch-symbol-labels \
+    --font "$SDR_CONSOLE_FONT_PATH" "${application_files[@]}"; then
+    warn 'The installed SDR Console label-symbol repair could not be applied; the compatibility font remains installed.'
   fi
 }
 
@@ -329,9 +331,9 @@ configure_symbol_fonts() {
     /v 'SDR Console UI (TrueType)' /t REG_SZ /d "$SDR_CONSOLE_FONT_FILE" /f
   WINEPREFIX="$PREFIX" wine reg add 'HKCU\Software\Wine\Fonts\Replacements' \
     /v 'Segoe UI' /t REG_SZ /d "$SEGOE_UI_REPLACEMENT" /f
-  patch_server_tab_symbol
+  patch_sdr_console_label_symbols
   WINEPREFIX="$PREFIX" wineboot -u
-  info 'font repair complete; close and restart SDR Console to reload its fonts and the Server-tab icon'
+  info 'font repair complete; close and restart SDR Console to reload its fonts and repaired menu symbols'
 }
 
 validate_dpi() {
@@ -575,7 +577,7 @@ main() {
       fi
       info "would build $SDR_CONSOLE_FONT_FILE in the SDR Console Wine prefix"
       info "would replace Segoe UI with $SEGOE_UI_REPLACEMENT in the SDR Console Wine prefix"
-      info 'would apply the guarded local Server-tab network-symbol compatibility patch when supported'
+      info 'would repair supported supplementary-plane symbols in installed SDR Console labels'
       return
     fi
     init_logging
