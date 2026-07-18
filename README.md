@@ -83,22 +83,20 @@ report zero devices under Wine.
 ### Missing Display Symbols
 
 If SDR Console shows rectangles between **High** and **Zoom**, the missing
-symbols are the `>|<` panoramic-centering control. Wine's built-in Webdings and
-Wingdings fonts have incomplete glyph coverage. Install the full Webdings font
-if it is not already present, then apply the prefix-only repair and restart SDR
-Console:
+symbols are the `>|<` panoramic-centering control: Unicode `U+25BA`, `U+2502`,
+and `U+25C4`. SDR Console draws these with **Segoe UI**. Wine can resolve that
+missing Windows font to Noto Sans, which does not contain the required glyphs.
+Apply the prefix-only repair and restart SDR Console:
 
 ```bash
-sudo apt install ttf-mscorefonts-installer
 ./setup.sh --fix-fonts
 ```
 
 `--fix-fonts` keeps all changes within SDR Console's isolated Wine prefix. It
-copies the locally installed Webdings font and downloads the pinned,
-SHA-256-verified [Deepin OpenSymbol Wingdings-compatible font](https://github.com/linuxdeepin/deepin-opensymbol-fonts)
-from its upstream project. It does not download or redistribute Microsoft fonts.
-The replacement remains subject to its upstream font license.
-Normal setup also applies the repair automatically.
+maps Wine's **Segoe UI** request to the locally installed free **DejaVu Sans**
+font, which contains the three control symbols. If needed, the script installs
+the distribution's `fonts-dejavu-core` package. Normal setup also applies the
+repair automatically.
 
 ### Selected Controls And Application Style
 
@@ -133,7 +131,7 @@ Console prefix and never changes the desktop's GNOME/KDE scaling.
 | `./setup.sh --upgrade` | Intentionally install a different staged installer. Normal reruns never upgrade automatically. |
 | `./setup.sh --rtl-tcp` | Install and start the local RTL-SDR TCP bridge; no SDR Console installer is required. |
 | `./setup.sh --rtl-tcp --dry-run` | Show the RTL-SDR bridge actions without changing the system. |
-| `./setup.sh --fix-fonts` | Install full Webdings when locally available plus a free Wingdings-compatible font in the Wine prefix, then restart SDR Console. |
+| `./setup.sh --fix-fonts` | Use DejaVu Sans for missing Segoe UI display symbols, then restart SDR Console. |
 | `./setup.sh --dpi 144` | Set the SDR Console Wine prefix to 144 DPI, then restart SDR Console. |
 | `./setup.sh --reset` | Remove the isolated installation and all SDR Console settings after confirmation. |
 | `./uninstall.sh` | Remove project-owned prefix, launchers, logs, and state after confirmation. |
@@ -157,9 +155,8 @@ creation, SDR Console installation, launcher creation, and verification.
   `${XDG_STATE_HOME:-~/.local/state}/sdr-console-wine/logs/`.
 - It creates `~/.local/bin/sdr-console` and a desktop-menu launcher. Both use
   the isolated prefix.
-- It installs prefix-local full Webdings and Wingdings-compatible fonts so Wine
-  selects them and the `>|<` display-centering symbols render correctly. The
-  free Wingdings-compatible font download is pinned and SHA-256 verified.
+- It maps Segoe UI to DejaVu Sans in the isolated Wine prefix so the `>|<`
+  display-centering symbols render correctly.
 - The optional RTL-SDR bridge is a per-user service named
   `sdr-console-rtl-tcp.service`. Its settings are in
   `~/.config/sdr-console-wine/rtl-tcp.conf`; it is deliberately bound to

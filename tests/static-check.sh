@@ -35,7 +35,7 @@ grep -Fqx 'X-SDR-Console-Wine-Managed=true' "$ROOT_DIR/setup.sh"
 grep -Fqx '      --rtl-tcp) RTL_TCP=1 ;;' "$ROOT_DIR/setup.sh"
 grep -Fqx '      --fix-fonts) FONT_FIX=1 ;;' "$ROOT_DIR/setup.sh"
 grep -Fqx '      --dpi)' "$ROOT_DIR/setup.sh"
-grep -Fqx "readonly PREFIX_WINGDINGS_FONT=\"\$PREFIX/drive_c/windows/Fonts/Wingdings.ttf\"" "$ROOT_DIR/setup.sh"
-grep -Fqx "readonly FREE_WINGDINGS_SHA256='887664b9bcea8d57d81ddf9471f4c4d61d97a1318cd5626d719cc5fe9346c04e'" "$ROOT_DIR/setup.sh"
+grep -Fqx "readonly DEJAVU_SANS_FONT='/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'" "$ROOT_DIR/setup.sh"
+grep -Fqx "readonly SEGOE_UI_REPLACEMENT='DejaVu Sans'" "$ROOT_DIR/setup.sh"
 
 printf 'static checks passed\n'

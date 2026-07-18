@@ -18,12 +18,8 @@ readonly RTL_TCP_SERVICE='sdr-console-rtl-tcp.service'
 readonly RTL_TCP_SERVICE_PATH="$SYSTEMD_USER_DIR/$RTL_TCP_SERVICE"
 readonly RTL_TCP_RUNNER_SOURCE="$SCRIPT_DIR/bin/sdr-console-rtl-tcp"
 readonly RTL_TCP_RUNNER_PATH="$USER_BIN_DIR/sdr-console-rtl-tcp"
-readonly FULL_WEBDINGS_FONT='/usr/share/fonts/truetype/msttcorefonts/Webdings.ttf'
-readonly PREFIX_WEBDINGS_FONT="$PREFIX/drive_c/windows/Fonts/Webdings.ttf"
-readonly FREE_WINGDINGS_URL='https://raw.githubusercontent.com/linuxdeepin/deepin-opensymbol-fonts/cf2404aee28fc895c01d6e5fdd6c4d38c8af1d3d/fonts/DeepinOpenSymbol.ttf'
-readonly FREE_WINGDINGS_SHA256='887664b9bcea8d57d81ddf9471f4c4d61d97a1318cd5626d719cc5fe9346c04e'
-readonly FREE_WINGDINGS_CACHE="$STATE_DIR/fonts/DeepinOpenSymbol.ttf"
-readonly PREFIX_WINGDINGS_FONT="$PREFIX/drive_c/windows/Fonts/Wingdings.ttf"
+readonly DEJAVU_SANS_FONT='/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+readonly SEGOE_UI_REPLACEMENT='DejaVu Sans'
 
 DRY_RUN=0
 DIAGNOSE=0
@@ -50,7 +46,7 @@ Options:
   --interactive  Show the Windows installer instead of using silent mode.
   --upgrade      Intentionally install a different staged installer.
   --rtl-tcp      Install and start the local RTL-SDR TCP bridge.
-  --fix-fonts    Repair missing SDR Console symbols with prefix-local fonts.
+  --fix-fonts    Repair SDR Console's missing display symbols.
   --dpi VALUE    Set the SDR Console Wine prefix DPI (for example: 96, 120, 144).
   --reset        Remove SDR Console user state, launchers, and logs.
   --yes          Confirm the vendor-terms prompt non-interactively.
@@ -272,55 +268,29 @@ install_rtl_tcp_bridge() {
   info 'In SDR Console, add or select "RTL Dongle (TCP)" with address 127.0.0.1 and port 1234.'
 }
 
-full_webdings_available() {
-  [[ -f "$FULL_WEBDINGS_FONT" ]]
+dejavu_sans_ready() {
+  [[ -r "$DEJAVU_SANS_FONT" ]]
 }
 
-font_matches_checksum() {
-  local path=$1
-  local expected=$2
-  [[ "$(sha256sum -- "$path" | awk '{print $1}')" == "$expected" ]]
-}
-
-install_prefix_font() {
-  local source_font=$1
-  local prefix_font=$2
-
-  if [[ ! -f "$prefix_font" ]] || ! cmp -s "$source_font" "$prefix_font"; then
-    mkdir -p "$(dirname "$prefix_font")"
-    install -m 0644 "$source_font" "$prefix_font"
-  fi
-}
-
-ensure_free_wingdings_font() {
-  if [[ -f "$FREE_WINGDINGS_CACHE" ]] && font_matches_checksum "$FREE_WINGDINGS_CACHE" "$FREE_WINGDINGS_SHA256"; then
+ensure_dejavu_sans() {
+  if dejavu_sans_ready; then
     return
   fi
 
-  command -v curl >/dev/null 2>&1 || die 'curl is required to download the free Wingdings-compatible font.'
-  info 'downloading the free Wingdings-compatible font'
-  mkdir -p "$(dirname "$FREE_WINGDINGS_CACHE")"
-  curl --fail --location --proto '=https' --retry 3 --silent --show-error --output "$FREE_WINGDINGS_CACHE" "$FREE_WINGDINGS_URL"
-  font_matches_checksum "$FREE_WINGDINGS_CACHE" "$FREE_WINGDINGS_SHA256" || die 'The downloaded Wingdings-compatible font did not match its expected SHA-256.'
+  info 'installing the DejaVu Sans font package'
+  sudo -v
+  sudo env DEBIAN_FRONTEND=noninteractive apt-get update
+  sudo env DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends fonts-dejavu-core
+  dejavu_sans_ready || die 'The fonts-dejavu-core package did not provide DejaVuSans.ttf as expected.'
 }
 
 configure_symbol_fonts() {
   [[ -d "$PREFIX" ]] || die 'The SDR Console Wine prefix is missing. Run ./setup.sh first.'
 
-  if full_webdings_available; then
-    info 'installing the full local Webdings font in the Wine prefix'
-    install_prefix_font "$FULL_WEBDINGS_FONT" "$PREFIX_WEBDINGS_FONT"
-    WINEPREFIX="$PREFIX" wine reg add 'HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts' \
-      /v 'Webdings (TrueType)' /t REG_SZ /d 'Webdings.ttf' /f
-  else
-    warn 'The full Webdings font is unavailable. Install ttf-mscorefonts-installer to repair every SDR Console symbol.'
-  fi
-
-  ensure_free_wingdings_font
-  info 'installing the free Wingdings-compatible font in the Wine prefix'
-  install_prefix_font "$FREE_WINGDINGS_CACHE" "$PREFIX_WINGDINGS_FONT"
-  WINEPREFIX="$PREFIX" wine reg add 'HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts' \
-    /v 'Wingdings (TrueType)' /t REG_SZ /d 'Wingdings.ttf' /f
+  ensure_dejavu_sans
+  info 'using DejaVu Sans for the missing Segoe UI display symbols'
+  WINEPREFIX="$PREFIX" wine reg add 'HKCU\Software\Wine\Fonts\Replacements' \
+    /v 'Segoe UI' /t REG_SZ /d "$SEGOE_UI_REPLACEMENT" /f
   WINEPREFIX="$PREFIX" wineboot -u
   info 'font repair complete; close and restart SDR Console to reload its fonts'
 }
@@ -559,13 +529,12 @@ main() {
   if (( FONT_FIX )); then
     if (( DRY_RUN )); then
       info 'dry run: no Wine registry values will be changed'
-      if full_webdings_available; then
-        info "would install $FULL_WEBDINGS_FONT as $PREFIX_WEBDINGS_FONT"
+      if dejavu_sans_ready; then
+        info "would use $DEJAVU_SANS_FONT as the Segoe UI replacement"
       else
-        info 'would skip the optional full Webdings font because ttf-mscorefonts-installer is unavailable'
+        info 'would install the fonts-dejavu-core package'
       fi
-      info "would download the pinned free Wingdings-compatible font to $FREE_WINGDINGS_CACHE"
-      info "would install it as $PREFIX_WINGDINGS_FONT"
+      info "would replace Segoe UI with $SEGOE_UI_REPLACEMENT in the SDR Console Wine prefix"
       return
     fi
     init_logging
