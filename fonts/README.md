@@ -14,3 +14,22 @@ name is `SDR Console UI`; it does not use the names `Bitstream`, `Vera`,
 
 This directory is not covered by the repository's MIT license. It contains no
 SDR Console vendor binaries or vendor fonts.
+
+## Added Glyphs
+
+The font starts with DejaVu Sans. Its merge adds exactly the Noto Sans Symbols 2
+code points that DejaVu Sans does not provide; it does not replace a shared
+DejaVu mapping. In the bundled font this means:
+
+- 5,918 DejaVu mappings are retained unchanged.
+- 1,682 mappings are added from Noto Sans Symbols 2: 369 in the BMP and 1,313
+  in the supplementary planes.
+- The added mappings include `U+1F4BB` (laptop), `U+1F50A` (speaker), and
+  `U+1F5A7` (network), along with technical, geometric, pictographic, and
+  historic-symbol ranges supplied by Noto Sans Symbols 2.
+
+The exact set is defined by `NotoSansSymbols2 cmap - DejaVuSans cmap` at build
+time. The build test checks both the count and that no shared DejaVu mapping is
+changed. Wine 9 still splits supplementary-plane characters into surrogate
+pairs in some SDR Console menus, so adding those glyphs alone cannot guarantee
+that those particular icons render.

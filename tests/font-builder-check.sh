@@ -21,15 +21,18 @@ trap 'rm -f "$font_output"' EXIT
   --symbols "$SYMBOL_FONT" \
   --output "$font_output" >/dev/null
 
-"$PYTHON_BIN" - "$font_output" "$BUNDLED_FONT" <<'PY'
+"$PYTHON_BIN" - "$BASE_FONT" "$font_output" "$BUNDLED_FONT" <<'PY'
 from fontTools.ttLib import TTFont
 import sys
 
-for path in sys.argv[1:]:
+base_cmap = TTFont(sys.argv[1]).getBestCmap()
+for path in sys.argv[2:]:
     font = TTFont(path)
     cmap = font.getBestCmap()
     assert all(codepoint in cmap for codepoint in (0x1F4BB, 0x1F5A7, 0x1F50A))
     assert not any(0xE777 <= codepoint <= 0xE77C for codepoint in cmap)
+    assert len(cmap.keys() - base_cmap.keys()) == 1682
+    assert all(cmap[codepoint] == base_cmap[codepoint] for codepoint in cmap.keys() & base_cmap.keys())
     assert {record.toUnicode() for record in font["name"].names if record.nameID == 16} == {"SDR Console UI"}
     assert {record.toUnicode() for record in font["name"].names if record.nameID == 17} == {"Regular"}
     assert any("SIL Open Font License" in record.toUnicode() for record in font["name"].names if record.nameID == 13)
