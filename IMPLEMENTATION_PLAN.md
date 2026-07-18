@@ -46,6 +46,10 @@ clear English documentation so users do not need an AI agent to complete setup.
   prefix.
 - Use the installer silent mode by default. Provide `--interactive` to help
   diagnose installer or Wine regressions.
+- When the full local Microsoft Webdings font is available, map it into the
+  Wine prefix. This restores SDR Console's `>|<` panoramic-centering symbols,
+  which Wine's compact compatibility Webdings font lacks. Provide `--fix-fonts`
+  for an explicit repair after the font is installed.
 - Install only named `apt` dependencies. Do not use `winetricks` or download
   Wine components from third-party sources. The manually supplied installer and
   its bundled Visual C++ redistributables are the only Windows installer input.

@@ -18,6 +18,7 @@ readonly RTL_TCP_SERVICE='sdr-console-rtl-tcp.service'
 readonly RTL_TCP_SERVICE_PATH="$SYSTEMD_USER_DIR/$RTL_TCP_SERVICE"
 readonly RTL_TCP_RUNNER_SOURCE="$SCRIPT_DIR/bin/sdr-console-rtl-tcp"
 readonly RTL_TCP_RUNNER_PATH="$USER_BIN_DIR/sdr-console-rtl-tcp"
+readonly FULL_WEBDINGS_FONT='/usr/share/fonts/truetype/msttcorefonts/Webdings.ttf'
 
 DRY_RUN=0
 DIAGNOSE=0
@@ -26,6 +27,7 @@ UPGRADE=0
 ASSUME_YES=0
 RESET=0
 RTL_TCP=0
+FONT_FIX=0
 INSTALLER_PATH=""
 INSTALLER_SHA256=""
 LOG_FILE=""
@@ -42,14 +44,15 @@ Options:
   --interactive  Show the Windows installer instead of using silent mode.
   --upgrade      Intentionally install a different staged installer.
   --rtl-tcp      Install and start the local RTL-SDR TCP bridge.
+  --fix-fonts    Use the full local Webdings font for missing SDR Console symbols.
   --reset        Remove SDR Console user state, launchers, and logs.
   --yes          Confirm the vendor-terms prompt non-interactively.
   -h, --help     Show this help.
 
 Place exactly one SDR Console .exe installer in place-setup-exe-file-here/
-before using install, upgrade, or dry-run mode. The --rtl-tcp option does not
-need an installer. Do not run this script with sudo; it requests sudo only for
-required apt package installation.
+before using install, upgrade, or dry-run mode. The --rtl-tcp and --fix-fonts
+options do not need an installer. Do not run this script with sudo; it requests
+sudo only for required apt package installation.
 EOF
 }
 
@@ -262,6 +265,28 @@ install_rtl_tcp_bridge() {
   info 'In SDR Console, add or select "RTL Dongle (TCP)" with address 127.0.0.1 and port 1234.'
 }
 
+full_webdings_available() {
+  [[ -f "$FULL_WEBDINGS_FONT" ]]
+}
+
+configure_webdings_font() {
+  [[ -d "$PREFIX" ]] || die 'The SDR Console Wine prefix is missing. Run ./setup.sh first.'
+  full_webdings_available || die "The full Webdings font is not installed. Install ttf-mscorefonts-installer, then re-run ./setup.sh --fix-fonts."
+
+  info 'configuring the full Webdings font for Wine'
+  WINEPREFIX="$PREFIX" wine reg add 'HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts' \
+    /v 'Webdings (TrueType)' /t REG_SZ /d 'Z:\usr\share\fonts\truetype\msttcorefonts\Webdings.ttf' /f
+  info 'font repair complete; close and restart SDR Console to reload its fonts'
+}
+
+configure_webdings_font_if_available() {
+  if full_webdings_available; then
+    configure_webdings_font
+  else
+    warn 'The full Webdings font is unavailable. If SDR Console shows rectangles for the >|< control, install ttf-mscorefonts-installer and run ./setup.sh --fix-fonts.'
+  fi
+}
+
 find_application() {
   local drive_c="$PREFIX/drive_c"
   [[ -d "$drive_c" ]] || return 1
@@ -419,6 +444,7 @@ parse_args() {
       --interactive) INTERACTIVE=1 ;;
       --upgrade) UPGRADE=1 ;;
       --rtl-tcp) RTL_TCP=1 ;;
+      --fix-fonts) FONT_FIX=1 ;;
       --reset) RESET=1 ;;
       --yes) ASSUME_YES=1 ;;
       -h|--help) usage; exit 0 ;;
@@ -435,6 +461,9 @@ parse_args() {
   fi
   if (( RTL_TCP && (DIAGNOSE || INTERACTIVE || UPGRADE || RESET) )); then
     die '--rtl-tcp cannot be combined with --diagnose, --interactive, --upgrade, or --reset.'
+  fi
+  if (( FONT_FIX && (DIAGNOSE || INTERACTIVE || UPGRADE || RESET || RTL_TCP) )); then
+    die '--fix-fonts cannot be combined with --diagnose, --interactive, --upgrade, --rtl-tcp, or --reset.'
   fi
 }
 
@@ -463,6 +492,21 @@ main() {
     fi
     init_logging
     install_rtl_tcp_bridge
+    return
+  fi
+
+  if (( FONT_FIX )); then
+    if (( DRY_RUN )); then
+      info 'dry run: no Wine registry values will be changed'
+      if full_webdings_available; then
+        info "would map Webdings to $FULL_WEBDINGS_FONT in the SDR Console Wine prefix"
+      else
+        info 'would require ttf-mscorefonts-installer before the font repair can run'
+      fi
+      return
+    fi
+    init_logging
+    configure_webdings_font
     return
   fi
 
@@ -504,6 +548,7 @@ main() {
     info 'existing SDR Console installation matches the staged installer; repairing launchers only'
     ensure_dependencies
     init_logging
+    configure_webdings_font_if_available
     write_launchers
     verify_installation
     return
@@ -513,6 +558,7 @@ main() {
   ensure_dependencies
   init_logging
   initialize_prefix
+  configure_webdings_font_if_available
   run_installer
   write_launchers
   verify_installation

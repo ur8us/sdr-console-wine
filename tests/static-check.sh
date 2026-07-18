@@ -33,5 +33,6 @@ grep -Fqx '# Managed by sdr-console-wine.' "$ROOT_DIR/bin/sdr-console"
 grep -Fqx '# Managed by sdr-console-wine.' "$ROOT_DIR/bin/sdr-console-rtl-tcp"
 grep -Fqx 'X-SDR-Console-Wine-Managed=true' "$ROOT_DIR/setup.sh"
 grep -Fqx '      --rtl-tcp) RTL_TCP=1 ;;' "$ROOT_DIR/setup.sh"
+grep -Fqx '      --fix-fonts) FONT_FIX=1 ;;' "$ROOT_DIR/setup.sh"
 
 printf 'static checks passed\n'
