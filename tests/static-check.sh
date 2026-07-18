@@ -14,6 +14,8 @@ check_file setup.sh
 check_file uninstall.sh
 check_file bin/sdr-console
 check_file bin/sdr-console-rtl-tcp
+check_file tools/build-sdr-console-ui-font.py
+check_file tests/font-builder-check.sh
 check_file README.md
 check_file LICENSE
 check_file .gitignore
@@ -28,6 +30,8 @@ bash -n "$ROOT_DIR/bin/sdr-console-rtl-tcp"
 [[ -x "$ROOT_DIR/uninstall.sh" ]]
 [[ -x "$ROOT_DIR/bin/sdr-console" ]]
 [[ -x "$ROOT_DIR/bin/sdr-console-rtl-tcp" ]]
+[[ -x "$ROOT_DIR/tools/build-sdr-console-ui-font.py" ]]
+[[ -x "$ROOT_DIR/tests/font-builder-check.sh" ]]
 grep -Fqx '/place-setup-exe-file-here/*.exe' "$ROOT_DIR/.gitignore"
 grep -Fqx '# Managed by sdr-console-wine.' "$ROOT_DIR/bin/sdr-console"
 grep -Fqx '# Managed by sdr-console-wine.' "$ROOT_DIR/bin/sdr-console-rtl-tcp"
@@ -36,6 +40,11 @@ grep -Fqx '      --rtl-tcp) RTL_TCP=1 ;;' "$ROOT_DIR/setup.sh"
 grep -Fqx '      --fix-fonts) FONT_FIX=1 ;;' "$ROOT_DIR/setup.sh"
 grep -Fqx '      --dpi)' "$ROOT_DIR/setup.sh"
 grep -Fqx "readonly DEJAVU_SANS_FONT='/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'" "$ROOT_DIR/setup.sh"
-grep -Fqx "readonly SEGOE_UI_REPLACEMENT='DejaVu Sans'" "$ROOT_DIR/setup.sh"
+grep -Fqx "readonly NOTO_SYMBOLS2_FONT='/usr/share/fonts/truetype/noto/NotoSansSymbols2-Regular.ttf'" "$ROOT_DIR/setup.sh"
+grep -Fqx "readonly SEGOE_UI_REPLACEMENT='SDR Console UI'" "$ROOT_DIR/setup.sh"
+"/usr/bin/python3" "$ROOT_DIR/tools/build-sdr-console-ui-font.py" --help | grep -F -- '--patch-server-tab PATH' >/dev/null
+
+dry_run_output="$($ROOT_DIR/setup.sh --fix-fonts --dry-run)"
+grep -Fqx '[sdr-console] would apply the guarded local Server-tab network-symbol compatibility patch when supported' <<<"$dry_run_output"
 
 printf 'static checks passed\n'

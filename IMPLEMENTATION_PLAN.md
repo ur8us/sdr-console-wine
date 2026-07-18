@@ -46,10 +46,12 @@ clear English documentation so users do not need an AI agent to complete setup.
   prefix.
 - Use the installer silent mode by default. Provide `--interactive` to help
   diagnose installer or Wine regressions.
-- When the full local Microsoft Webdings font is available, map it into the
-  Wine prefix. This restores SDR Console's `>|<` panoramic-centering symbols,
-  which Wine's compact compatibility Webdings font lacks. Provide `--fix-fonts`
-  for an explicit repair after the font is installed.
+- Build a prefix-local compatibility font from the distribution's free DejaVu
+  Sans and Noto Sans Symbols 2 fonts. Map Segoe UI to it to restore SDR
+  Console's `>|<` panoramic-centering symbols. On Wine 9, replace the known
+  Server-tab surrogate-pair label in the installed local DLL with private-use
+  glyphs from that font; the patch must be exact-match guarded, never ship the
+  modified vendor DLL, and be rerunnable through `--fix-fonts`.
 - Provide a `--dpi VALUE` command that changes only the isolated SDR Console
   Wine prefix. This makes high-DPI correction reproducible and avoids users
   mistakenly changing their unrelated default `~/.wine` prefix.
