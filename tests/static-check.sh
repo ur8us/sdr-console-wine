@@ -16,6 +16,10 @@ check_file bin/sdr-console
 check_file bin/sdr-console-rtl-tcp
 check_file tools/build-sdr-console-ui-font.py
 check_file tests/font-builder-check.sh
+check_file fonts/SDRConsoleUI.ttf
+check_file fonts/README.md
+check_file fonts/LICENSES/OFL-1.1.txt
+check_file fonts/LICENSES/DEJAVU-LICENSE.txt
 check_file README.md
 check_file LICENSE
 check_file .gitignore
@@ -39,12 +43,11 @@ grep -Fqx 'X-SDR-Console-Wine-Managed=true' "$ROOT_DIR/setup.sh"
 grep -Fqx '      --rtl-tcp) RTL_TCP=1 ;;' "$ROOT_DIR/setup.sh"
 grep -Fqx '      --fix-fonts) FONT_FIX=1 ;;' "$ROOT_DIR/setup.sh"
 grep -Fqx '      --dpi)' "$ROOT_DIR/setup.sh"
-grep -Fqx "readonly DEJAVU_SANS_FONT='/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'" "$ROOT_DIR/setup.sh"
-grep -Fqx "readonly NOTO_SYMBOLS2_FONT='/usr/share/fonts/truetype/noto/NotoSansSymbols2-Regular.ttf'" "$ROOT_DIR/setup.sh"
+grep -Fqx 'readonly BUNDLED_COMPATIBILITY_FONT="$SCRIPT_DIR/fonts/SDRConsoleUI.ttf"' "$ROOT_DIR/setup.sh"
 grep -Fqx "readonly SEGOE_UI_REPLACEMENT='SDR Console UI'" "$ROOT_DIR/setup.sh"
-"/usr/bin/python3" "$ROOT_DIR/tools/build-sdr-console-ui-font.py" --help | grep -F -- '--patch-server-tab PATH' >/dev/null
+! "/usr/bin/python3" "$ROOT_DIR/tools/build-sdr-console-ui-font.py" --help | grep -F -- '--patch' >/dev/null
 
 dry_run_output="$($ROOT_DIR/setup.sh --fix-fonts --dry-run)"
-grep -Fqx '[sdr-console] would apply the guarded local Server-tab network-symbol compatibility patch when supported' <<<"$dry_run_output"
+grep -Fqx '[sdr-console] would not modify SDR Console executable or DLL files' <<<"$dry_run_output"
 
 printf 'static checks passed\n'

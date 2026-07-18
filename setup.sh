@@ -18,10 +18,7 @@ readonly RTL_TCP_SERVICE='sdr-console-rtl-tcp.service'
 readonly RTL_TCP_SERVICE_PATH="$SYSTEMD_USER_DIR/$RTL_TCP_SERVICE"
 readonly RTL_TCP_RUNNER_SOURCE="$SCRIPT_DIR/bin/sdr-console-rtl-tcp"
 readonly RTL_TCP_RUNNER_PATH="$USER_BIN_DIR/sdr-console-rtl-tcp"
-readonly DEJAVU_SANS_FONT='/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
-readonly NOTO_SYMBOLS2_FONT='/usr/share/fonts/truetype/noto/NotoSansSymbols2-Regular.ttf'
-readonly FONT_BUILDER_SOURCE="$SCRIPT_DIR/tools/build-sdr-console-ui-font.py"
-readonly PYTHON_BIN='/usr/bin/python3'
+readonly BUNDLED_COMPATIBILITY_FONT="$SCRIPT_DIR/fonts/SDRConsoleUI.ttf"
 readonly SEGOE_UI_REPLACEMENT='SDR Console UI'
 readonly SDR_CONSOLE_FONT_FILE='SDRConsoleUI.ttf'
 readonly SDR_CONSOLE_FONT_PATH="$PREFIX/drive_c/windows/Fonts/$SDR_CONSOLE_FONT_FILE"
@@ -273,67 +270,23 @@ install_rtl_tcp_bridge() {
   info 'In SDR Console, add or select "RTL Dongle (TCP)" with address 127.0.0.1 and port 1234.'
 }
 
-symbol_font_dependencies_ready() {
-  [[ -r "$DEJAVU_SANS_FONT" && -r "$NOTO_SYMBOLS2_FONT" ]] || return 1
-  "$PYTHON_BIN" -c 'import fontTools' >/dev/null 2>&1
-}
-
-ensure_symbol_font_dependencies() {
-  if symbol_font_dependencies_ready; then
-    return
-  fi
-
-  info 'installing free font-build dependencies'
-  sudo -v
-  sudo env DEBIAN_FRONTEND=noninteractive apt-get update
-  sudo env DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends \
-    fonts-dejavu-core fonts-noto-core python3-fonttools
-  symbol_font_dependencies_ready || die 'The required free font-build dependencies are still incomplete after apt installation.'
-}
-
-build_sdr_console_ui_font() {
-  [[ -x "$FONT_BUILDER_SOURCE" ]] || die "Missing font builder: $FONT_BUILDER_SOURCE"
-  mkdir -p "$(dirname -- "$SDR_CONSOLE_FONT_PATH")"
-  "$PYTHON_BIN" "$FONT_BUILDER_SOURCE" \
-    --base "$DEJAVU_SANS_FONT" \
-    --symbols "$NOTO_SYMBOLS2_FONT" \
-    --output "$SDR_CONSOLE_FONT_PATH"
-  chmod 0644 "$SDR_CONSOLE_FONT_PATH"
-}
-
-patch_sdr_console_label_symbols() {
-  local application application_dir candidate
-  local -a application_files=()
-  application="$(find_application || true)"
-  if [[ -z "$application" ]]; then
-    warn 'SDR Console.exe was not found; skipped the installed-label symbol repair.'
-    return
-  fi
-  application_dir="$(dirname -- "$application")"
-  while IFS= read -r -d '' candidate; do
-    application_files+=("$candidate")
-  done < <(find "$application_dir" -type f \( -iname '*.dll' -o -iname '*.exe' \) -print0)
-
-  if ! "$PYTHON_BIN" "$FONT_BUILDER_SOURCE" --patch-symbol-labels \
-    --font "$SDR_CONSOLE_FONT_PATH" "${application_files[@]}"; then
-    warn 'The installed SDR Console label-symbol repair could not be applied; the compatibility font remains installed.'
-  fi
+install_sdr_console_ui_font() {
+  [[ -r "$BUNDLED_COMPATIBILITY_FONT" ]] || die "Missing bundled compatibility font: $BUNDLED_COMPATIBILITY_FONT"
+  install -Dm0644 "$BUNDLED_COMPATIBILITY_FONT" "$SDR_CONSOLE_FONT_PATH"
 }
 
 configure_symbol_fonts() {
   [[ -d "$PREFIX" ]] || die 'The SDR Console Wine prefix is missing. Run ./setup.sh first.'
 
-  ensure_symbol_font_dependencies
-  info 'building the free SDR Console compatibility font'
-  build_sdr_console_ui_font
+  info 'installing the bundled SDR Console compatibility font'
+  install_sdr_console_ui_font
   info 'registering the compatibility font inside the Wine prefix'
   WINEPREFIX="$PREFIX" wine reg add 'HKLM\Software\Microsoft\Windows NT\CurrentVersion\Fonts' \
     /v 'SDR Console UI (TrueType)' /t REG_SZ /d "$SDR_CONSOLE_FONT_FILE" /f
   WINEPREFIX="$PREFIX" wine reg add 'HKCU\Software\Wine\Fonts\Replacements' \
     /v 'Segoe UI' /t REG_SZ /d "$SEGOE_UI_REPLACEMENT" /f
-  patch_sdr_console_label_symbols
   WINEPREFIX="$PREFIX" wineboot -u
-  info 'font repair complete; close and restart SDR Console to reload its fonts and repaired menu symbols'
+  info 'font installation complete; close and restart SDR Console to reload its fonts'
 }
 
 validate_dpi() {
@@ -570,14 +523,9 @@ main() {
   if (( FONT_FIX )); then
     if (( DRY_RUN )); then
       info 'dry run: no packages, Wine registry values, font files, or SDR Console DLLs will be changed'
-      if symbol_font_dependencies_ready; then
-        info 'free font-build dependencies are already installed'
-      else
-        info 'would install fonts-dejavu-core, fonts-noto-core, and python3-fonttools'
-      fi
-      info "would build $SDR_CONSOLE_FONT_FILE in the SDR Console Wine prefix"
+      info "would install $SDR_CONSOLE_FONT_FILE in the SDR Console Wine prefix"
       info "would replace Segoe UI with $SEGOE_UI_REPLACEMENT in the SDR Console Wine prefix"
-      info 'would repair supported supplementary-plane symbols in installed SDR Console labels'
+      info 'would not modify SDR Console executable or DLL files'
       return
     fi
     init_logging
