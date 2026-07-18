@@ -25,6 +25,9 @@ its installer is not included or redistributed here.
 - Wine comes only from the standard `apt` repositories. Setup enables `i386`
   packages and installs both 32-bit and 64-bit Wine support because the SDR
   Console setup program is 32-bit while the application is 64-bit.
+- Ubuntu 24.04's Wine 9.0 packages are the current tested Wine baseline. Wine
+  11.0 was evaluated separately and is not supported for SDR Console on the
+  tested host; see [the Wine 11 evaluation](docs/WINE11-EVALUATION.md).
 - The first intended radio path is an already configured PlutoSDR over IP. The
   scripts do not alter networks, probe radios, or change PlutoSDR firmware.
 - Wine cannot give SDR Console's Windows RTL USB driver direct access to a
@@ -99,6 +102,17 @@ limitation: the script deliberately never rewrites SDR Console `.exe` or `.dll`
 files, so it remains safe across SDR Console releases. The bundled composite
 font is documented under [its own licenses](fonts/README.md); no vendor binary
 or font is included, downloaded, or modified.
+
+### Wine Version Choice
+
+Use the Wine version installed by `./setup.sh`. Do not replace it with Wine 11
+for SDR Console based on this project's testing: a clean, isolated Wine 11.0
+prefix displayed the SDR Console window but did not become responsive, while
+continuing to consume CPU and memory. This result applies only to the recorded
+host/application combination and is not a claim about Wine 11 generally. It is
+not fixed by reinstalling SDR Console. The detailed test scope, observations,
+and non-invasive cleanup boundaries are recorded in
+[the Wine 11 evaluation](docs/WINE11-EVALUATION.md).
 
 ### Selected Controls And Application Style
 
