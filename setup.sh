@@ -28,6 +28,7 @@ ASSUME_YES=0
 RESET=0
 RTL_TCP=0
 FONT_FIX=0
+DPI=""
 INSTALLER_PATH=""
 INSTALLER_SHA256=""
 LOG_FILE=""
@@ -45,14 +46,15 @@ Options:
   --upgrade      Intentionally install a different staged installer.
   --rtl-tcp      Install and start the local RTL-SDR TCP bridge.
   --fix-fonts    Use the full local Webdings font for missing SDR Console symbols.
+  --dpi VALUE    Set the SDR Console Wine prefix DPI (for example: 96, 120, 144).
   --reset        Remove SDR Console user state, launchers, and logs.
   --yes          Confirm the vendor-terms prompt non-interactively.
   -h, --help     Show this help.
 
 Place exactly one SDR Console .exe installer in place-setup-exe-file-here/
-before using install, upgrade, or dry-run mode. The --rtl-tcp and --fix-fonts
-options do not need an installer. Do not run this script with sudo; it requests
-sudo only for required apt package installation.
+before using install, upgrade, or dry-run mode. The --rtl-tcp, --fix-fonts, and
+--dpi options do not need an installer. Do not run this script with sudo; it
+requests sudo only for required apt package installation.
 EOF
 }
 
@@ -287,6 +289,21 @@ configure_webdings_font_if_available() {
   fi
 }
 
+validate_dpi() {
+  [[ "$DPI" =~ ^[0-9]+$ ]] || die '--dpi requires an integer value.'
+  (( DPI >= 96 && DPI <= 384 )) || die '--dpi must be between 96 and 384.'
+}
+
+configure_dpi() {
+  [[ -d "$PREFIX" ]] || die 'The SDR Console Wine prefix is missing. Run ./setup.sh first.'
+  validate_dpi
+
+  info "setting SDR Console Wine prefix DPI to $DPI"
+  WINEPREFIX="$PREFIX" wine reg add 'HKCU\Control Panel\Desktop' /v LogPixels /t REG_DWORD /d "$DPI" /f
+  WINEPREFIX="$PREFIX" wine reg add 'HKCU\Control Panel\Desktop' /v Win8DpiScaling /t REG_DWORD /d 1 /f
+  info 'DPI change complete; close and restart SDR Console to apply it'
+}
+
 find_application() {
   local drive_c="$PREFIX/drive_c"
   [[ -d "$drive_c" ]] || return 1
@@ -445,6 +462,11 @@ parse_args() {
       --upgrade) UPGRADE=1 ;;
       --rtl-tcp) RTL_TCP=1 ;;
       --fix-fonts) FONT_FIX=1 ;;
+      --dpi)
+        shift
+        (( $# > 0 )) || die '--dpi requires a value, for example: --dpi 144.'
+        DPI="$1"
+        ;;
       --reset) RESET=1 ;;
       --yes) ASSUME_YES=1 ;;
       -h|--help) usage; exit 0 ;;
@@ -464,6 +486,9 @@ parse_args() {
   fi
   if (( FONT_FIX && (DIAGNOSE || INTERACTIVE || UPGRADE || RESET || RTL_TCP) )); then
     die '--fix-fonts cannot be combined with --diagnose, --interactive, --upgrade, --rtl-tcp, or --reset.'
+  fi
+  if [[ -n "$DPI" ]] && (( DIAGNOSE || INTERACTIVE || UPGRADE || RESET || RTL_TCP || FONT_FIX )); then
+    die '--dpi cannot be combined with --diagnose, --interactive, --upgrade, --rtl-tcp, --fix-fonts, or --reset.'
   fi
 }
 
@@ -507,6 +532,18 @@ main() {
     fi
     init_logging
     configure_webdings_font
+    return
+  fi
+
+  if [[ -n "$DPI" ]]; then
+    if (( DRY_RUN )); then
+      validate_dpi
+      info 'dry run: no Wine registry values will be changed'
+      info "would set the SDR Console Wine prefix DPI to $DPI"
+      return
+    fi
+    init_logging
+    configure_dpi
     return
   fi
 

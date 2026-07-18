@@ -50,6 +50,9 @@ clear English documentation so users do not need an AI agent to complete setup.
   Wine prefix. This restores SDR Console's `>|<` panoramic-centering symbols,
   which Wine's compact compatibility Webdings font lacks. Provide `--fix-fonts`
   for an explicit repair after the font is installed.
+- Provide a `--dpi VALUE` command that changes only the isolated SDR Console
+  Wine prefix. This makes high-DPI correction reproducible and avoids users
+  mistakenly changing their unrelated default `~/.wine` prefix.
 - Install only named `apt` dependencies. Do not use `winetricks` or download
   Wine components from third-party sources. The manually supplied installer and
   its bundled Visual C++ redistributables are the only Windows installer input.

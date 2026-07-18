@@ -97,6 +97,20 @@ sudo apt install ttf-mscorefonts-installer
 locally installed Webdings font into SDR Console's Wine prefix. Normal setup
 also applies the mapping automatically when that font is already installed.
 
+### Interface Scaling
+
+SDR Console uses the isolated Wine prefix, so `wine winecfg` changes the wrong
+settings unless `WINEPREFIX` is set. Use the project command instead, then
+restart SDR Console:
+
+```bash
+./setup.sh --dpi 144
+```
+
+Use `96` for classic Windows scaling, `120` for a moderate increase, and `144`
+for a 1080p laptop panel around 143 PPI. The command updates only the SDR
+Console prefix and never changes the desktop's GNOME/KDE scaling.
+
 ## Commands
 
 | Command | Purpose |
@@ -109,6 +123,7 @@ also applies the mapping automatically when that font is already installed.
 | `./setup.sh --rtl-tcp` | Install and start the local RTL-SDR TCP bridge; no SDR Console installer is required. |
 | `./setup.sh --rtl-tcp --dry-run` | Show the RTL-SDR bridge actions without changing the system. |
 | `./setup.sh --fix-fonts` | Map an already installed full Webdings font into the Wine prefix, then restart SDR Console. |
+| `./setup.sh --dpi 144` | Set the SDR Console Wine prefix to 144 DPI, then restart SDR Console. |
 | `./setup.sh --reset` | Remove the isolated installation and all SDR Console settings after confirmation. |
 | `./uninstall.sh` | Remove project-owned prefix, launchers, logs, and state after confirmation. |
 | `./uninstall.sh --dry-run` | List the files that uninstall would remove. |
